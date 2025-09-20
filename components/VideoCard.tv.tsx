@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Animated } from "react-native";
+import { View, Text, Image, StyleSheet, Pressable, TouchableOpacity, Alert, Animated, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Star, Play } from "lucide-react-native";
 import { PlayRecordManager } from "@/services/storage";
 import { API } from "@/services/api";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
+import Logger from '@/utils/Logger';
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+
+const logger = Logger.withTag('VideoCardTV');
 
 interface VideoCardProps extends React.ComponentProps<typeof TouchableOpacity> {
   id: string;
@@ -50,6 +54,8 @@ const VideoCard = forwardRef<View, VideoCardProps>(
     const longPressTriggered = useRef(false);
 
     const scale = useRef(new Animated.Value(1)).current;
+
+    const deviceType = useResponsiveLayout().deviceType;
 
     const animatedStyle = {
       transform: [{ scale }],
@@ -131,7 +137,7 @@ const VideoCard = forwardRef<View, VideoCardProps>(
                 router.replace("/");
               }
             } catch (error) {
-              console.info("Failed to delete play record:", error);
+              logger.info("Failed to delete play record:", error);
               Alert.alert("错误", "删除观看记录失败，请重试");
             }
           },
@@ -144,13 +150,19 @@ const VideoCard = forwardRef<View, VideoCardProps>(
 
     return (
       <Animated.View style={[styles.wrapper, animatedStyle, { opacity: fadeAnim }]}>
-        <TouchableOpacity
+        <Pressable
+          android_ripple={Platform.isTV || deviceType !== 'tv' ? { color: 'transparent' } : { color: Colors.dark.link }}
           onPress={handlePress}
           onLongPress={handleLongPress}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          style={styles.pressable}
-          activeOpacity={1}
+          style={({ pressed }) => [
+            styles.pressable,
+            {
+              zIndex: pressed ? 999 : 1, // 确保按下时有最高优先级
+            },
+          ]}
+          // activeOpacity={1}
           delayLongPress={1000}
         >
           <View style={styles.card}>
@@ -195,12 +207,12 @@ const VideoCard = forwardRef<View, VideoCardProps>(
             {isContinueWatching && (
               <View style={styles.infoRow}>
                 <ThemedText style={styles.continueLabel}>
-                  第{episodeIndex! + 1}集 已观看 {Math.round((progress || 0) * 100)}%
+                  第{episodeIndex}集 已观看 {Math.round((progress || 0) * 100)}%
                 </ThemedText>
               </View>
             )}
           </View>
-        </TouchableOpacity>
+        </Pressable>
       </Animated.View>
     );
   }
@@ -218,9 +230,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   pressable: {
+    width: CARD_WIDTH + 20,
+    height: CARD_HEIGHT + 60,
+    justifyContent: 'center',
     alignItems: "center",
+    overflow: "visible",
   },
   card: {
+    marginTop: 10,
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     borderRadius: 8,
